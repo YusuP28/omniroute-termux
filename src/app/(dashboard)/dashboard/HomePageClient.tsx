@@ -43,7 +43,6 @@ export default function HomePageClient({ machineId }) {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [providerMetrics, setProviderMetrics] = useState({});
 
-  const [versionInfo, setVersionInfo] = useState<any>(null);
   const [updating, setUpdating] = useState(false);
   const [updateSteps, setUpdateSteps] = useState<UpdateStep[]>([]);
   const [updatePhase, setUpdatePhase] = useState<"idle" | "running" | "done" | "failed">("idle");
@@ -56,11 +55,10 @@ export default function HomePageClient({ machineId }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [provRes, modelsRes, metricsRes, versionRes] = await Promise.all([
+      const [provRes, modelsRes, metricsRes] = await Promise.all([
         fetch("/api/providers"),
         fetch("/api/models"),
         fetch("/api/provider-metrics"),
-        fetch("/api/system/version"),
       ]);
       if (provRes.ok) {
         const provData = await provRes.json();
@@ -73,10 +71,6 @@ export default function HomePageClient({ machineId }) {
       if (metricsRes.ok) {
         const metricsData = await metricsRes.json();
         setProviderMetrics(metricsData.metrics || {});
-      }
-      if (versionRes.ok) {
-        const versionData = await versionRes.json();
-        setVersionInfo(versionData);
       }
     } catch (e) {
       console.log("Error fetching data:", e);
@@ -208,7 +202,6 @@ export default function HomePageClient({ machineId }) {
           }
 
           const latestInfo = await versionRes.json();
-          setVersionInfo(latestInfo);
 
           if (latestInfo.current === targetVersion) {
             setUpdateSteps((prev) => {
@@ -535,34 +528,6 @@ export default function HomePageClient({ machineId }) {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Update Notification Banner */}
-      {versionInfo?.updateAvailable && !showUpdateOverlay && (
-        <div className="bg-primary/10 border border-primary/20 text-primary px-5 py-4 rounded-xl flex items-center justify-between min-h-[64px]">
-          <div className="flex items-center gap-4">
-            <span className="material-symbols-outlined text-[24px]">system_update_alt</span>
-            <div>
-              <p className="font-semibold text-sm">Update Available: v{versionInfo.latest}</p>
-              <p className="text-xs opacity-80 mt-0.5">
-                {versionInfo.autoUpdateSupported
-                  ? t("updateAvailableDesc") ||
-                    `You are currently using v${versionInfo.current}. Update to access the latest features and bug fixes.`
-                  : versionInfo.autoUpdateError ||
-                    "Manual update required for this installation type."}
-              </p>
-            </div>
-          </div>
-          <Button
-            size="sm"
-            onClick={versionInfo.autoUpdateSupported ? handleUpdate : undefined}
-            disabled={updating || !versionInfo.autoUpdateSupported}
-            className="shrink-0 ml-4 font-semibold"
-            title={versionInfo.autoUpdateError || ""}
-          >
-            {versionInfo.autoUpdateSupported ? t("updateNow") || "Update Now" : "Manual Update"}
-          </Button>
         </div>
       )}
 
