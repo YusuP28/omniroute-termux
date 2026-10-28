@@ -49,7 +49,9 @@
   "homepage": "https://omniroute.online",
   "scripts": {
     "dev": "node scripts/run-next.mjs dev",
-    "build": "node scripts/build-next-isolated.mjs",
+    "build": "next build --webpack",
+    "build:isolated": "node scripts/build-next-isolated.mjs --webpack",
+    "build:android": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build --webpack",
     "build:cli": "node scripts/prepublish.mjs",
     "start": "node scripts/run-next.mjs start",
     "lint": "eslint .",
@@ -120,13 +122,9 @@
     "tsx": "^4.21.0",
     "undici": "^8.0.2",
     "uuid": "^13.0.0",
-    "wreq-js": "^2.0.1",
     "yazl": "^3.3.1",
     "zod": "^4.3.6",
     "zustand": "^5.0.10"
-  },
-  "optionalDependencies": {
-    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -135,7 +133,6 @@
     "@testing-library/react": "^16.3.2",
     "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/keytar": "^4.4.0",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -156,6 +153,10 @@
     "vitest": "^4.1.2",
     "wait-on": "^9.0.4",
     "wtfnode": "^0.10.1"
+  },
+  "optionalDependencies": {
+    "@next/swc-wasm-nodejs": "^16.2.3",
+    "wreq-js": "^2.0.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs}": [

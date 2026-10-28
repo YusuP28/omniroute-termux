@@ -1,25 +1,31 @@
-import createNextIntlPlugin from "next-intl/plugin";
+import path from "node:path";
 
-const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const distDir = process.env.NEXT_DIST_DIR || ".next";
+
+/**
+ * Android/Termux migration notes:
+ * - Turbopack is disabled in favour of Webpack (`next build --webpack`,
+ *   `next dev --webpack`). Turbopack's native binaries are not available for
+ *   Android ARM64.
+ * - `keytar` is no longer referenced: Zed credential import uses the local
+ *   JSON credential store (`src/lib/zed-oauth/credential-store.ts`).
+ * - `next-intl/plugin` is intentionally not imported: it statically imports
+ *   `@swc/core`, which publishes no Android binary and would crash config
+ *   loading. For Webpack the plugin only aliases `next-intl/config` to the
+ *   request config, so that alias is applied manually below.
+ */
+
+const requestConfigPath = path.resolve(process.cwd(), "src/i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir,
-  // Turbopack config: redirect native modules to stubs at build time
-  turbopack: {
-    resolveAlias: {
-      // Point mitm/manager to a stub during build (native child_process/fs can't be bundled)
-      "@/mitm/manager": "./src/mitm/manager.stub.ts",
-    },
-  },
   output: "standalone",
   serverExternalPackages: [
     "pino",
     "pino-pretty",
     "thread-stream",
     "better-sqlite3",
-    "keytar",
     "wreq-js",
     "zod",
     "child_process",
@@ -45,19 +51,32 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer, webpack }) => {
+    // Equivalent of what `createNextIntlPlugin` does for Webpack:
+    // resolve the abstract `next-intl/config` module to this app's request config.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "next-intl/config": requestConfigPath,
+    };
+
     if (isServer) {
+      // Webpack resolves the native MITM manager through a build-time stub.
+      // (Previously this alias only existed under `turbopack.resolveAlias`.)
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "@/mitm/manager$": path.resolve(process.cwd(), "src/mitm/manager.stub.ts"),
+      };
       // Webpack IgnorePlugin: skip thread-stream test files that contain
-      // intentionally broken syntax/imports (they cause Turbopack build errors)
+      // intentionally broken syntax/imports (they cause build errors)
       config.plugins.push(
         new webpack.IgnorePlugin({
           resourceRegExp: /\/test\//,
           contextRegExp: /thread-stream/,
         })
       );
-      // ── Turbopack / Next.js 16 module-hash patch (#394, #396, #398) ────────
+      // ── Next.js 16 module-hash patch (#394, #396, #398) ────────────────────
       //
-      // Next.js 16 (with or without Turbopack) compiles the instrumentation hook
-      // into a separate chunk and emits hashed require() calls such as:
+      // Next.js 16 compiles the instrumentation hook into a separate chunk and
+      // emits hashed require() calls such as:
       //   require('better-sqlite3-90e2652d1716b047')
       //   require('zod-dcb22c6336e0bc69')
       //   require('pino-28069d5257187539')
@@ -74,7 +93,6 @@ const nextConfig = {
 
       const KNOWN_EXTERNALS = new Set([
         "better-sqlite3",
-        "keytar",
         "wreq-js",
         "zod",
         "pino",
@@ -170,4 +188,4 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default nextConfig;

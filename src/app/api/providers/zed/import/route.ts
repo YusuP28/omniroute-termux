@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
   if (authError) return authError;
 
   try {
-    // Check if Zed is installed
+    // Check if Zed is installed / whether the local credential store has entries
     const zedInstalled = await isZedInstalled();
 
     if (!zedInstalled) {
@@ -48,8 +48,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
       );
     }
 
-    // Discover credentials from keychain
-    console.log("[Zed Import] Discovering Zed credentials from keychain...");
+    // Discover credentials from the local JSON credential store (no keytar).
+    console.log("[Zed Import] Discovering Zed credentials from the local credential store...");
     const credentials = await discoverZedCredentials();
 
     if (credentials.length === 0) {
@@ -120,7 +120,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
         {
           success: false,
           error:
-            "Keychain service not available on this system. On Linux, install libsecret-1-dev.",
+            "No Zed credentials found. Populate the local credential store " +
+            "(~/.omniroute/zed-credentials.json) and try again.",
         },
         { status: 404 }
       );
