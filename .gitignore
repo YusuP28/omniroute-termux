@@ -85,6 +85,8 @@ docs/*
 !docs/TASKS.md
 !docs/FASE-*.md
 !docs/adr/
+!docs/agents/
+!docs/agents/**
 !docs/cli-tools/
 !docs/planning/
 !docs/improvement-plans/
