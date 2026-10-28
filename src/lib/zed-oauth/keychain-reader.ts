@@ -1,29 +1,28 @@
 /**
  * Zed IDE OAuth Token Extractor
  *
- * Extracts OAuth credentials previously stored by Zed IDE.
+ * Extracts OAuth credentials from the OS keychain where Zed IDE stores them.
+ * Supports macOS (Keychain), Windows (Credential Manager), and Linux (libsecret).
  *
- * Android/Termux note: `keytar` (libsecret / Keychain / Credential Manager) is
- * not available on Android, so it is no longer used. Credentials are read from
- * OmniRoute's local JSON credential store instead:
+ * `keytar` is a native module (e.g. libsecret on Linux) and is unavailable on
+ * Android/Termux. All keychain access goes through `credential-store`, which
+ * transparently falls back to an AES-256-GCM encrypted JSON file in the OmniRoute
+ * data directory. This module therefore never crashes when keytar is missing.
  *
- *   $DATA_DIR/zed-credentials.json   (default ~/.omniroute/zed-credentials.json)
- *
- * See `./credential-store.ts` for the on-disk format and helpers. On desktop
- * platforms keytar could be re-introduced as an optional enrichment source,
- * but the app must never require it to boot.
+ * @see https://zed.dev/docs/ai/llm-providers - Official Zed documentation confirming keychain storage
  */
 
 import fs from "fs";
 import os from "os";
 import path from "path";
 import {
-  findStoredCredentials,
-  getStoredPassword,
-  hasStoredCredentials,
-  upsertStoredCredential,
-  removeStoredCredentials,
-  getCredentialStorePath,
+  deletePassword,
+  findCredentials,
+  getKeychainBackend,
+  getLocalStorePath,
+  getPassword,
+  setPassword,
+  type KeychainBackend,
 } from "./credential-store";
 
 export interface ZedCredential {
@@ -31,6 +30,12 @@ export interface ZedCredential {
   service: string;
   account: string;
   token: string;
+}
+
+export interface KeychainStatus {
+  backend: KeychainBackend;
+  /** Absolute path of the encrypted fallback store. */
+  storePath: string;
 }
 
 /**
@@ -96,7 +101,22 @@ function extractProviderFromService(service: string): string {
 }
 
 /**
- * Discovers all Zed OAuth credentials from the local credential store.
+ * Reports which credential backend is active. Used by the import endpoint to tell
+ * the user whether the OS keychain or the encrypted local store is in use.
+ */
+export async function getKeychainStatus(): Promise<KeychainStatus> {
+  return {
+    backend: await getKeychainBackend(),
+    storePath: getLocalStorePath(),
+  };
+}
+
+/**
+ * Discovers all Zed OAuth credentials.
+ *
+ * Reads the OS keychain when keytar is usable, otherwise (Termux/Android, or a
+ * keytar runtime failure) reads the encrypted local store. Never throws when the
+ * keychain is unavailable — it just returns an empty list.
  *
  * @returns Array of discovered credentials with provider, service, and token
  */
@@ -105,73 +125,97 @@ export async function discoverZedCredentials(): Promise<ZedCredential[]> {
   const seen = new Set<string>();
 
   for (const pattern of ZED_SERVICE_PATTERNS) {
-    for (const stored of findStoredCredentials(pattern)) {
-      if (!stored.token) {
-        console.debug(`Skipping credential with missing token: ${pattern}/${stored.account}`);
-        continue;
+    try {
+      const found = await findCredentials(pattern);
+
+      for (const credential of found) {
+        if (!credential?.password) {
+          console.debug(`Skipping credential with missing password: ${pattern}/${credential?.account}`);
+          continue;
+        }
+
+        const dedupeKey = `${pattern}::${credential.account}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
+        credentials.push({
+          provider: extractProviderFromService(pattern),
+          service: pattern,
+          account: credential.account,
+          token: credential.password,
+        });
       }
-
-      const key = `${pattern.toLowerCase()}::${stored.account}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      credentials.push({
-        provider: stored.provider || extractProviderFromService(pattern),
-        service: pattern,
-        account: stored.account,
-        token: stored.token,
-      });
+    } catch (error: any) {
+      console.debug(`No credentials found for ${pattern}:`, error?.message || error);
+      // Continue to next pattern
     }
-  }
-
-  if (credentials.length === 0) {
-    console.debug(
-      `[Zed credentials] No credentials found in ${getCredentialStorePath()} — nothing to import`
-    );
   }
 
   return credentials;
 }
 
 /**
+ * Persists a credential to the active backend. When keytar is unavailable this
+ * writes to the encrypted local store, which keeps the import flow usable on
+ * Termux/Android (either seeded from the desktop or entered manually).
+ *
+ * @returns The backend that stored the credential.
+ */
+export async function saveZedCredential(credential: ZedCredential): Promise<KeychainBackend> {
+  return setPassword(credential.service, credential.account, credential.token);
+}
+
+/**
+ * Removes a credential from both the OS keychain and the encrypted local store.
+ */
+export async function removeZedCredential(service: string, account: string): Promise<boolean> {
+  return deletePassword(service, account);
+}
+
+/**
  * Gets a specific Zed credential for a provider.
  *
- * First resolves any credential stored for the matching service patterns, then
- * falls back to common account names (api-key, token, oauth, <provider>).
+ * Health #2: Instead of hardcoded account names, first try findCredentials
+ * which returns all actual credentials for the service, then fall back to common
+ * patterns only if needed.
  *
  * @param provider - Provider name (openai, anthropic, google, etc.)
  * @returns The credential if found, null otherwise
  */
 export async function getZedCredential(provider: string): Promise<ZedCredential | null> {
-  const patterns = ZED_SERVICE_PATTERNS.filter((p) =>
-    p.toLowerCase().includes(provider.toLowerCase())
+  const patterns = ZED_SERVICE_PATTERNS.filter((pattern) =>
+    pattern.toLowerCase().includes(provider.toLowerCase())
   );
 
   for (const pattern of patterns) {
-    // First, try the first stored credential for this service.
-    const stored = findStoredCredentials(pattern).find((credential) => credential.token);
-    if (stored) {
-      return {
-        provider: stored.provider || extractProviderFromService(pattern),
-        service: pattern,
-        account: stored.account,
-        token: stored.token,
-      };
-    }
-
-    // Fallback: Try common account name patterns.
-    const accountNames = ["api-key", "token", "oauth", provider];
-
-    for (const account of accountNames) {
-      const token = getStoredPassword(pattern, account);
-      if (token) {
+    try {
+      // First, try findCredentials to get all actual credentials
+      const credentials = await findCredentials(pattern);
+      if (credentials.length > 0 && credentials[0].password) {
         return {
           provider,
           service: pattern,
-          account,
-          token,
+          account: credentials[0].account,
+          token: credentials[0].password,
         };
       }
+
+      // Fallback: Try common account name patterns
+      const accountNames = ["api-key", "token", "oauth", provider];
+
+      for (const account of accountNames) {
+        const token = await getPassword(pattern, account);
+        if (token) {
+          return {
+            provider,
+            service: pattern,
+            account,
+            token,
+          };
+        }
+      }
+    } catch (error: any) {
+      console.debug(`Failed to get credential for ${pattern}:`, error?.message || error);
     }
   }
 
@@ -179,12 +223,11 @@ export async function getZedCredential(provider: string): Promise<ZedCredential 
 }
 
 /**
- * Checks whether Zed-related configuration or credentials are available.
+ * Checks if Zed IDE appears to be installed and configured
  *
- * On Android/Termux Zed is not installed, so the local credential store is the
- * authoritative signal that there is something to import.
+ * Health #3: Convert to ES imports instead of CommonJS require()
  *
- * @returns true if a Zed config directory or stored credentials exist
+ * @returns true if Zed config directory exists
  */
 export async function isZedInstalled(): Promise<boolean> {
   const homeDir = os.homedir();
@@ -200,14 +243,5 @@ export async function isZedInstalled(): Promise<boolean> {
     }
   }
 
-  return hasStoredCredentials();
+  return false;
 }
-
-// Re-exported so callers (CLI/import UI) can seed the local store without
-// pulling in keytar.
-export {
-  upsertStoredCredential,
-  removeStoredCredentials,
-  getCredentialStorePath,
-  hasStoredCredentials,
-};

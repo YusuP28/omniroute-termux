@@ -6,13 +6,30 @@
  * Discovers and imports OAuth credentials from Zed IDE's keychain storage.
  * Supports all major Zed providers: OpenAI, Anthropic, Google, Mistral, xAI, etc.
  *
+ * When keytar/libsecret is unavailable (Android/Termux), the endpoint falls back to
+ * the encrypted local store at `$DATA_DIR/zed-credentials.json`. Callers can also
+ * seed that store directly by sending `{ provider, account, token }` in the body.
+ *
  * Security: protected by requireManagementAuth.
  */
 
 import { NextResponse } from "next/server";
-import { discoverZedCredentials, isZedInstalled } from "@/lib/zed-oauth/keychain-reader";
+import {
+  discoverZedCredentials,
+  getKeychainStatus,
+  isZedInstalled,
+  saveZedCredential,
+  type KeychainStatus,
+} from "@/lib/zed-oauth/keychain-reader";
 import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 import { createProviderConnection } from "@/lib/db/providers";
+
+interface ManualImportBody {
+  provider?: string;
+  service?: string;
+  account?: string;
+  token?: string;
+}
 
 interface ImportResponse {
   success: boolean;
@@ -26,6 +43,40 @@ interface ImportResponse {
   }>;
   error?: string;
   zedInstalled?: boolean;
+  storage?: KeychainStatus["backend"];
+  storagePath?: string;
+}
+
+/**
+ * Saves a single credential to the active backend + OmniRoute's provider table.
+ * Used for manual seeding on platforms without libsecret (Termux/Android).
+ */
+async function importOne(
+  provider: string,
+  service: string,
+  account: string,
+  token: string
+): Promise<ImportResponse> {
+  const status = await getKeychainStatus();
+  const backend = await saveZedCredential({ provider, service, account, token });
+
+  await createProviderConnection({
+    provider,
+    authType: "apikey",
+    apiKey: token,
+    name: `Zed Import (${account || service})`,
+    isActive: true,
+  });
+
+  return {
+    success: true,
+    count: 1,
+    providers: [provider],
+    credentials: [{ provider, service, account, hasToken: true }],
+    zedInstalled: true,
+    storage: backend,
+    storagePath: status.storePath,
+  };
 }
 
 export async function POST(request: Request): Promise<NextResponse<ImportResponse> | Response> {
@@ -33,23 +84,75 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
   const authError = await requireManagementAuth(request);
   if (authError) return authError;
 
+  const status = await getKeychainStatus();
+
   try {
-    // Check if Zed is installed / whether the local credential store has entries
+    // Manual seed path: works on Termux where there is no OS keychain at all.
+    const body = (await request.json().catch(() => null)) as ManualImportBody | null;
+    if (body?.token) {
+      const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+      const token = body.token.trim();
+
+      if (!provider) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Missing 'provider' for manual credential import.",
+            storage: status.backend,
+            storagePath: status.storePath,
+          },
+          { status: 400 }
+        );
+      }
+
+      const service =
+        typeof body.service === "string" && body.service.trim()
+          ? body.service.trim()
+          : `zed-${provider}`;
+      const account =
+        typeof body.account === "string" && body.account.trim() ? body.account.trim() : "api-key";
+
+      try {
+        const result = await importOne(provider, service, account, token);
+        console.log(
+          `[Zed Import] Manually stored credential for ${provider} in ${result.storage} backend`
+        );
+        return NextResponse.json(result);
+      } catch (err: any) {
+        console.error(`[Zed Import] Failed to save manual credential for ${provider}:`, err);
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Failed to store credential: ${err?.message || "Unknown error"}`,
+            storage: status.backend,
+            storagePath: status.storePath,
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Check if Zed is installed
     const zedInstalled = await isZedInstalled();
 
     if (!zedInstalled) {
       return NextResponse.json(
         {
           success: false,
-          error: "Zed IDE does not appear to be installed on this system.",
+          error:
+            "Zed IDE does not appear to be installed on this system. " +
+            "On Android/Termux you can seed the encrypted local store instead by POSTing " +
+            '{"provider":"openai","token":"<api-key>"}.',
           zedInstalled: false,
+          storage: status.backend,
+          storagePath: status.storePath,
         },
         { status: 404 }
       );
     }
 
-    // Discover credentials from the local JSON credential store (no keytar).
-    console.log("[Zed Import] Discovering Zed credentials from the local credential store...");
+    // Discover credentials from the active backend (keytar or encrypted file)
+    console.log(`[Zed Import] Discovering Zed credentials via ${status.backend} backend...`);
     const credentials = await discoverZedCredentials();
 
     if (credentials.length === 0) {
@@ -59,6 +162,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
         providers: [],
         credentials: [],
         zedInstalled: true,
+        storage: status.backend,
+        storagePath: status.storePath,
       });
     }
 
@@ -101,6 +206,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
       providers: uniqueProviders,
       credentials: credentialSummary,
       zedInstalled: true,
+      storage: status.backend,
+      storagePath: status.storePath,
     });
   } catch (error: any) {
     console.error("[Zed Import] Error importing credentials:", error);
@@ -110,6 +217,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
         {
           success: false,
           error: "Keychain access denied. Please grant permission when prompted by your OS.",
+          storage: status.backend,
+          storagePath: status.storePath,
         },
         { status: 403 }
       );
@@ -120,8 +229,11 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
         {
           success: false,
           error:
-            "No Zed credentials found. Populate the local credential store " +
-            "(~/.omniroute/zed-credentials.json) and try again.",
+            "Keychain service not available on this system. " +
+            "On Android/Termux, keytar/libsecret is not supported — credentials are stored " +
+            `encrypted at ${status.storePath}. Seed it with POST {"provider":"<id>","token":"<key>"}.`,
+          storage: status.backend,
+          storagePath: status.storePath,
         },
         { status: 404 }
       );
@@ -131,6 +243,8 @@ export async function POST(request: Request): Promise<NextResponse<ImportRespons
       {
         success: false,
         error: `Failed to import credentials: ${error?.message || "Unknown error"}`,
+        storage: status.backend,
+        storagePath: status.storePath,
       },
       { status: 500 }
     );

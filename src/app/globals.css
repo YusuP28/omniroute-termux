@@ -215,6 +215,15 @@ body.electron-macos {
   scrollbar-width: thin;
 }
 
+/* Hide scrollbar utility for mobile breadcrumbs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Hero gradient */
 .bg-hero-gradient {
   background: linear-gradient(180deg, #f0f0f5 0%, #f9f9fb 100%);
@@ -355,5 +364,50 @@ button .material-symbols-outlined,
 
   .ant-table {
     min-width: 600px; /* Prevent columns from crushing together */
+  }
+
+  /* Better touch targets for mobile */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Improve form inputs on mobile */
+  input, select, textarea {
+    font-size: 16px; /* Prevents zoom on focus in iOS */
+  }
+
+  /* Reduce header padding on very small screens */
+  header {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Ensure content doesn't overflow */
+  main {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
+
+/* Extra small screens (phones in portrait) */
+@media (max-width: 480px) {
+  .ant-table-wrapper {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    width: calc(100% + 1.5rem);
+  }
+
+  /* Tighter spacing for cards */
+  .card, [class*="Card"] {
+    padding: 0.75rem;
+  }
+}
+
+/* Landscape phones */
+@media (max-width: 768px) and (orientation: landscape) {
+  header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
   }
 }

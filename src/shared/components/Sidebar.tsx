@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -43,6 +43,8 @@ export default function Sidebar({
   const [hiddenSidebarItems, setHiddenSidebarItems] = useState<string[]>([]);
   const [customAppName, setCustomAppName] = useState<string | null>(null);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLAsideElement>(null);
+  const touchStartX = useRef<number>(0);
 
   useEffect(() => {
     const applySettings = (data) => {
@@ -90,6 +92,21 @@ export default function Sidebar({
       );
     };
   }, []);
+
+  // Handle swipe to close on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!onClose || !sidebarRef.current) return;
+    const currentX = e.touches[0].clientX;
+    const diffX = touchStartX.current - currentX;
+    // Swipe right to left to close (when sidebar is open)
+    if (diffX > 50) {
+      onClose();
+    }
+  };
 
   const isActive = (href, exact) => {
     if (exact) {
@@ -145,13 +162,13 @@ export default function Sidebar({
     const active = !item.external && isActive(item.href, item.exact);
     const className = cn(
       "flex items-center gap-3 rounded-lg transition-all group",
-      collapsed ? "justify-center px-2 py-2.5" : "px-4 py-2",
+      collapsed ? "justify-center px-2 py-3" : "px-4 py-2.5",
       active
         ? "bg-primary/10 text-primary"
         : "text-text-muted hover:bg-surface/50 hover:text-text-main"
     );
     const iconClassName = cn(
-      "material-symbols-outlined text-[18px]",
+      "material-symbols-outlined text-[20px]",
       active ? "fill-1" : "group-hover:text-primary transition-colors"
     );
     const content = (
@@ -193,6 +210,9 @@ export default function Sidebar({
   return (
     <>
       <aside
+        ref={sidebarRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         className={cn(
           "flex h-full min-h-0 flex-col border-r border-black/5 bg-vibrancy backdrop-blur-xl transition-all duration-300 ease-in-out dark:border-white/5",
           collapsed ? "w-16" : "w-80"
@@ -231,12 +251,12 @@ export default function Sidebar({
                 aria-expanded={!collapsed}
                 aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                 className={cn(
-                  "rounded-md p-1 text-text-muted/50 transition-colors hover:bg-black/5 hover:text-text-muted dark:hover:bg-white/5",
+                  "rounded-md p-2 text-text-muted/50 transition-colors hover:bg-black/5 hover:text-text-muted dark:hover:bg-white/5",
                   collapsed && !isMacElectron && "mt-2",
                   isMacElectron && "ml-auto"
                 )}
               >
-                <span className="material-symbols-outlined text-[16px]" aria-hidden="true">
+                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
                   {collapsed ? "chevron_right" : "chevron_left"}
                 </span>
               </button>

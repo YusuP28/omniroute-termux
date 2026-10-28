@@ -1,223 +1,313 @@
 /**
- * Zed credential store — Android/Termux-compatible replacement for `keytar`.
+ * Zed credential store with a keytar → encrypted-file fallback.
  *
- * `keytar` is a native module that relies on libsecret (Linux), Keychain
- * (macOS) or Credential Manager (Windows). None of these exist on Android,
- * and building keytar under Termux fails. Credentials are therefore persisted
- * in a local JSON file inside the OmniRoute data directory:
+ * `keytar` is a native module that needs libsecret on Linux and is unavailable on
+ * Android/Termux. Every keytar call is therefore wrapped: if the module is missing
+ * (e.g. `node_modules/keytar` renamed) or a call fails at runtime, the store
+ * transparently falls back to an AES-256-GCM encrypted JSON file in the OmniRoute
+ * data directory (`DATA_DIR`, default `~/.omniroute/zed-credentials.json`).
  *
- *   $DATA_DIR/zed-credentials.json
- *   (default: ~/.omniroute/zed-credentials.json)
- *
- * Override the location with `OMNIROUTE_ZED_CREDENTIALS_FILE`.
- *
- * The file is created with mode 0600 and written atomically (tmp file +
- * rename), so a crash mid-write cannot corrupt existing credentials.
- * Nothing in this module ever logs a token.
+ * The fallback key lives next to the store in `zed-credentials.key` (mode 0600) and
+ * is generated on first use — no libsecret, no env var required.
  */
 
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
 import { resolveDataDir } from "../dataPaths";
 
-export interface StoredZedCredential {
-  service: string;
-  account: string;
-  token: string;
-  /** OmniRoute provider id (openai, anthropic, ...). Optional on disk. */
-  provider?: string;
-  /** ISO timestamp of the last write. */
-  updatedAt?: string;
-}
-
-export interface CredentialStoreFile {
-  version: number;
-  credentials: StoredZedCredential[];
-}
-
+const STORE_FILE = "zed-credentials.json";
+const KEY_FILE = "zed-credentials.key";
 const STORE_VERSION = 1;
-const STORE_FILE_NAME = "zed-credentials.json";
+const ALGORITHM = "aes-256-gcm";
+const IV_LENGTH = 12;
+const KEY_LENGTH = 32;
+const PREFIX = "enc:v1:";
 
-/** Warn only once per process for a corrupt/unreadable store. */
-let warnedAboutBadStore = false;
+export type KeychainBackend = "keytar" | "file";
 
-export function getCredentialStorePath(): string {
-  const configured = process.env.OMNIROUTE_ZED_CREDENTIALS_FILE?.trim();
-  if (configured) return path.resolve(configured);
-  return path.join(resolveDataDir(), STORE_FILE_NAME);
+export interface StoredCredential {
+  account: string;
+  password: string;
 }
 
-function emptyStore(): CredentialStoreFile {
-  return { version: STORE_VERSION, credentials: [] };
+interface StoreFile {
+  version: number;
+  updatedAt: string;
+  /** service -> account -> encrypted password */
+  services: Record<string, Record<string, string>>;
 }
 
-function normalizeEntry(value: unknown): StoredZedCredential | null {
-  if (!value || typeof value !== "object") return null;
+/** Minimal keytar surface (CJS/native; typings may not expose `default`). */
+export type KeytarModule = {
+  findCredentials: (service: string) => Promise<Array<{ account: string; password: string }>>;
+  getPassword: (service: string, account: string) => Promise<string | null>;
+  setPassword: (service: string, account: string, password: string) => Promise<void>;
+  deletePassword: (service: string, account: string) => Promise<boolean>;
+};
 
-  const raw = value as Record<string, unknown>;
-  const service = typeof raw.service === "string" ? raw.service.trim() : "";
-  const account = typeof raw.account === "string" ? raw.account.trim() : "";
-  const token = typeof raw.token === "string" ? raw.token : "";
-
-  if (!service || !account || !token) return null;
-
-  const entry: StoredZedCredential = { service, account, token };
-  if (typeof raw.provider === "string" && raw.provider.trim()) {
-    entry.provider = raw.provider.trim();
-  }
-  if (typeof raw.updatedAt === "string" && raw.updatedAt.trim()) {
-    entry.updatedAt = raw.updatedAt.trim();
-  }
-  return entry;
-}
+let keytarCache: KeytarModule | null | undefined; // undefined = not probed yet
 
 /**
- * Reads the credential store. Missing, malformed or unreadable files are
- * treated as "no credentials" so the app can always boot without keytar.
+ * Probe keytar once. Returns null when the module is missing or unusable.
+ * Never throws — this is the crash guard for Termux/Android.
  */
-export function readCredentialStore(): CredentialStoreFile {
-  const storePath = getCredentialStorePath();
+export async function loadKeytar(): Promise<KeytarModule | null> {
+  if (keytarCache !== undefined) return keytarCache;
 
-  let raw: string;
   try {
-    raw = fs.readFileSync(storePath, "utf8");
+    const mod = (await import("keytar")) as { default?: KeytarModule } & KeytarModule;
+    const resolved = mod?.default ?? mod;
+    keytarCache =
+      resolved && typeof resolved.getPassword === "function" ? (resolved as KeytarModule) : null;
+  } catch {
+    keytarCache = null;
+  }
+
+  return keytarCache;
+}
+
+/** Which backend the store currently uses. */
+export async function getKeychainBackend(): Promise<KeychainBackend> {
+  return (await loadKeytar()) ? "keytar" : "file";
+}
+
+/** Absolute path of the encrypted fallback store (for diagnostics/tests). */
+export function getLocalStorePath(): string {
+  return path.join(resolveDataDir(), STORE_FILE);
+}
+
+/** Absolute path of the fallback encryption key (for diagnostics/tests). */
+export function getLocalKeyPath(): string {
+  return path.join(resolveDataDir(), KEY_FILE);
+}
+
+// ── Encryption ───────────────────────────────────────────────────────────────
+
+let cachedKey: Buffer | null = null;
+
+function getLocalKey(): Buffer {
+  if (cachedKey) return cachedKey;
+
+  const keyFile = getLocalKeyPath();
+  try {
+    const decoded = Buffer.from(fs.readFileSync(keyFile, "utf8").trim(), "base64");
+    if (decoded.length === KEY_LENGTH) {
+      cachedKey = decoded;
+      return decoded;
+    }
+  } catch {
+    // Missing/corrupt key file — generate a new one below.
+  }
+
+  const key = randomBytes(KEY_LENGTH);
+  fs.mkdirSync(path.dirname(keyFile), { recursive: true });
+  fs.writeFileSync(keyFile, key.toString("base64"), { mode: 0o600 });
+  try {
+    fs.chmodSync(keyFile, 0o600);
+  } catch {
+    // chmod is best-effort (no-op on some Android filesystems).
+  }
+
+  cachedKey = key;
+  return key;
+}
+
+function encryptValue(plaintext: string): string {
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, getLocalKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return `${PREFIX}${iv.toString("base64url")}:${ciphertext.toString("base64url")}:${authTag.toString("base64url")}`;
+}
+
+function decryptValue(value: string): string | null {
+  // Legacy plaintext entries are returned as-is so old stores keep working.
+  if (!value.startsWith(PREFIX)) return value;
+
+  const [ivB64, ciphertextB64, authTagB64] = value.slice(PREFIX.length).split(":");
+  if (!ivB64 || !ciphertextB64 || !authTagB64) return null;
+
+  try {
+    const decipher = createDecipheriv(
+      ALGORITHM,
+      getLocalKey(),
+      Buffer.from(ivB64, "base64url")
+    );
+    decipher.setAuthTag(Buffer.from(authTagB64, "base64url"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(ciphertextB64, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
   } catch (error: any) {
-    // ENOENT is the normal "nothing imported yet" case — stay quiet.
-    if (error?.code !== "ENOENT" && !warnedAboutBadStore) {
-      warnedAboutBadStore = true;
+    console.warn("[Zed credentials] Failed to decrypt stored credential:", error?.message || error);
+    return null;
+  }
+}
+
+// ── File backend ─────────────────────────────────────────────────────────────
+
+function readStore(): StoreFile {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(getLocalStorePath(), "utf8")) as StoreFile;
+    if (parsed && typeof parsed === "object" && parsed.services) {
+      return {
+        version: parsed.version ?? STORE_VERSION,
+        updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+        services: parsed.services,
+      };
+    }
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") {
+      console.warn("[Zed credentials] Could not read local store:", error?.message || error);
+    }
+  }
+
+  return { version: STORE_VERSION, updatedAt: new Date().toISOString(), services: {} };
+}
+
+let writeChain: Promise<void> = Promise.resolve();
+
+/** Serialize writes and persist atomically (tmp file + rename, mode 0600). */
+function writeStore(store: StoreFile): Promise<void> {
+  const run = async () => {
+    const file = getLocalStorePath();
+    await fs.promises.mkdir(path.dirname(file), { recursive: true });
+
+    const next: StoreFile = { ...store, updatedAt: new Date().toISOString() };
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+
+    await fs.promises.writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+    await fs.promises.rename(tmp, file);
+
+    try {
+      await fs.promises.chmod(file, 0o600);
+    } catch {
+      // Best-effort on Android filesystems.
+    }
+  };
+
+  writeChain = writeChain.then(run, run);
+  return writeChain;
+}
+
+async function fileFindCredentials(service: string): Promise<StoredCredential[]> {
+  const accounts = readStore().services[service];
+  if (!accounts) return [];
+
+  const credentials: StoredCredential[] = [];
+  for (const [account, value] of Object.entries(accounts)) {
+    const password = decryptValue(value);
+    if (password) credentials.push({ account, password });
+  }
+  return credentials;
+}
+
+async function fileGetPassword(service: string, account: string): Promise<string | null> {
+  const value = readStore().services[service]?.[account];
+  return value ? decryptValue(value) : null;
+}
+
+async function fileSetPassword(
+  service: string,
+  account: string,
+  password: string
+): Promise<void> {
+  const store = readStore();
+  store.services[service] = store.services[service] || {};
+  store.services[service][account] = encryptValue(password);
+  await writeStore(store);
+}
+
+async function fileDeletePassword(service: string, account: string): Promise<boolean> {
+  const store = readStore();
+  const bucket = store.services[service];
+  if (!bucket?.[account]) return false;
+
+  delete bucket[account];
+  if (Object.keys(bucket).length === 0) delete store.services[service];
+
+  await writeStore(store);
+  return true;
+}
+
+// ── Facade: keytar first, encrypted file as fallback ─────────────────────────
+
+export async function findCredentials(service: string): Promise<StoredCredential[]> {
+  const keytar = await loadKeytar();
+
+  if (keytar) {
+    try {
+      const credentials = await keytar.findCredentials(service);
+      const valid = (credentials || []).filter(
+        (credential) => typeof credential?.password === "string" && credential.password.length > 0
+      );
+      if (valid.length > 0) return valid;
+    } catch (error: any) {
       console.warn(
-        `[Zed credentials] Cannot read ${storePath}: ${error?.message || error}. ` +
-          "Continuing with an empty credential store."
+        `[Zed credentials] keytar findCredentials failed for '${service}', using local store:`,
+        error?.message || error
       );
     }
-    return emptyStore();
   }
 
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    // Accept both { version, credentials: [] } and a bare [] array.
-    const list = Array.isArray(parsed)
-      ? parsed
-      : Array.isArray((parsed as CredentialStoreFile | null)?.credentials)
-        ? (parsed as CredentialStoreFile).credentials
-        : [];
+  return fileFindCredentials(service);
+}
 
-    return {
-      version: STORE_VERSION,
-      credentials: list
-        .map(normalizeEntry)
-        .filter((entry): entry is StoredZedCredential => !!entry),
-    };
-  } catch (error: any) {
-    if (!warnedAboutBadStore) {
-      warnedAboutBadStore = true;
+export async function getPassword(service: string, account: string): Promise<string | null> {
+  const keytar = await loadKeytar();
+
+  if (keytar) {
+    try {
+      const password = await keytar.getPassword(service, account);
+      if (password) return password;
+    } catch (error: any) {
       console.warn(
-        `[Zed credentials] Ignoring malformed JSON in ${storePath}: ${error?.message || error}`
+        `[Zed credentials] keytar getPassword failed for '${service}/${account}', using local store:`,
+        error?.message || error
       );
     }
-    return emptyStore();
   }
+
+  return fileGetPassword(service, account);
 }
 
-/**
- * Persists the store atomically. Returns false instead of throwing, so a
- * read-only home directory cannot crash the app.
- */
-export function writeCredentialStore(store: CredentialStoreFile): boolean {
-  const storePath = getCredentialStorePath();
-  const tmpPath = `${storePath}.${process.pid}.${Date.now()}.tmp`;
+export async function setPassword(
+  service: string,
+  account: string,
+  password: string
+): Promise<KeychainBackend> {
+  const keytar = await loadKeytar();
 
-  try {
-    fs.mkdirSync(path.dirname(storePath), { recursive: true, mode: 0o700 });
-    const payload = JSON.stringify(
-      { version: STORE_VERSION, credentials: store.credentials },
-      null,
-      2
-    );
-    fs.writeFileSync(tmpPath, `${payload}\n`, { encoding: "utf8", mode: 0o600 });
-    fs.renameSync(tmpPath, storePath);
+  if (keytar) {
     try {
-      fs.chmodSync(storePath, 0o600);
-    } catch {
-      // chmod is best-effort (e.g. FAT/exFAT storage).
+      await keytar.setPassword(service, account, password);
+      return "keytar";
+    } catch (error: any) {
+      console.warn(
+        `[Zed credentials] keytar setPassword failed for '${service}/${account}', using local store:`,
+        error?.message || error
+      );
     }
-    return true;
-  } catch (error: any) {
+  }
+
+  await fileSetPassword(service, account, password);
+  return "file";
+}
+
+export async function deletePassword(service: string, account: string): Promise<boolean> {
+  const keytar = await loadKeytar();
+  let deleted = false;
+
+  if (keytar) {
     try {
-      fs.rmSync(tmpPath, { force: true });
+      deleted = await keytar.deletePassword(service, account);
     } catch {
-      // ignore cleanup failure
+      // Fall through to the local store.
     }
-    console.warn(
-      `[Zed credentials] Cannot write ${storePath}: ${error?.message || error}. ` +
-        "Credentials will not survive a restart."
-    );
-    return false;
-  }
-}
-
-/** Returns all credentials for a service (case-insensitive service match). */
-export function findStoredCredentials(service: string): StoredZedCredential[] {
-  const needle = service.trim().toLowerCase();
-  if (!needle) return [];
-
-  return readCredentialStore().credentials.filter(
-    (credential) => credential.service.toLowerCase() === needle
-  );
-}
-
-/** Returns a single credential token, or null when it is not stored. */
-export function getStoredPassword(service: string, account: string): string | null {
-  const match = findStoredCredentials(service).find((credential) => credential.account === account);
-  return match?.token ?? null;
-}
-
-/** Inserts or replaces a credential (same service + account). */
-export function upsertStoredCredential(
-  credential: Omit<StoredZedCredential, "updatedAt"> & { updatedAt?: string }
-): boolean {
-  const entry = normalizeEntry({
-    ...credential,
-    updatedAt: credential.updatedAt ?? new Date().toISOString(),
-  });
-  if (!entry) return false;
-
-  const store = readCredentialStore();
-  const index = store.credentials.findIndex(
-    (existing) =>
-      existing.service.toLowerCase() === entry.service.toLowerCase() &&
-      existing.account === entry.account
-  );
-
-  if (index >= 0) {
-    store.credentials[index] = entry;
-  } else {
-    store.credentials.push(entry);
   }
 
-  return writeCredentialStore(store);
-}
-
-/** Removes every credential for a service. Returns the number removed. */
-export function removeStoredCredentials(service: string): number {
-  const needle = service.trim().toLowerCase();
-  if (!needle) return 0;
-
-  const store = readCredentialStore();
-  const kept = store.credentials.filter(
-    (credential) => credential.service.toLowerCase() !== needle
-  );
-  const removed = store.credentials.length - kept.length;
-
-  if (removed > 0) {
-    store.credentials = kept;
-    writeCredentialStore(store);
-  }
-
-  return removed;
-}
-
-/** True when at least one usable credential exists in the local store. */
-export function hasStoredCredentials(): boolean {
-  return readCredentialStore().credentials.length > 0;
+  const deletedLocally = await fileDeletePassword(service, account);
+  return deleted || deletedLocally;
 }

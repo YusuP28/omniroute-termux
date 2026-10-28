@@ -141,9 +141,14 @@ export default function Header({ onMenuClick, showMenuButton = true }) {
     }
   };
 
+  // Mobile breadcrumbs (simplified)
+  const mobileBreadcrumbs = breadcrumbs.length > 0
+    ? breadcrumbs.slice(-2) // Show last 2 breadcrumbs on mobile
+    : title ? [{ label: title }] : [];
+
   return (
     <header
-      className="sticky top-0 z-10 flex items-center justify-between border-b border-black/5 bg-bg/80 px-8 py-5 backdrop-blur-xl dark:border-white/5"
+      className="sticky top-0 z-10 flex items-center justify-between border-b border-black/5 bg-bg/80 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 backdrop-blur-xl dark:border-white/5"
       style={{
         paddingTop: isMacElectron
           ? "calc(1.25rem + var(--desktop-safe-top))"
@@ -151,13 +156,14 @@ export default function Header({ onMenuClick, showMenuButton = true }) {
       }}
     >
       {/* Mobile menu button */}
-      <div className="flex items-center gap-3 lg:hidden">
+      <div className="flex items-center gap-2 lg:hidden">
         {showMenuButton && (
           <button
             onClick={onMenuClick}
-            className="text-text-main hover:text-primary transition-colors"
+            className="text-text-main hover:text-primary transition-colors p-2 -ml-2"
+            aria-label="Open navigation menu"
           >
-            <span className="material-symbols-outlined">menu</span>
+            <span className="material-symbols-outlined text-[28px]">menu</span>
           </button>
         )}
       </div>
@@ -215,6 +221,33 @@ export default function Header({ onMenuClick, showMenuButton = true }) {
             {description && <p className="text-sm text-text-muted">{description}</p>}
           </div>
         ) : null}
+      </div>
+
+      {/* Mobile page title & breadcrumbs */}
+      <div className="flex-1 lg:hidden min-w-0">
+        {mobileBreadcrumbs.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+            {mobileBreadcrumbs.map((crumb, index) => (
+              <div key={`${crumb.label}-${crumb.href || "current"}`} className="flex items-center gap-1.5 flex-shrink-0">
+                {index > 0 && (
+                  <span className="material-symbols-outlined text-text-muted text-sm">chevron_right</span>
+                )}
+                {crumb.href ? (
+                  <Link
+                    href={crumb.href}
+                    className="text-sm text-text-muted hover:text-primary transition-colors whitespace-nowrap"
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className="text-base font-semibold text-text-main truncate max-w-[200px]">
+                    {crumb.label}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Right actions */}
