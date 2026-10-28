@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Sidebar from "../Sidebar";
 import Header from "../Header";
 import Breadcrumbs from "../Breadcrumbs";
@@ -42,6 +42,32 @@ export default function DashboardLayout({ children }) {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
   };
 
+  // Close sidebar on route change (mobile)
+  const handleRouteChange = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
+
+  // Register route change listener
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Listen for Next.js route changes
+    const handlePopState = () => handleRouteChange();
+    window.addEventListener("popstate", handlePopState);
+
+    // Also listen for Next.js router events if available
+    const originalPushState = window.history.pushState;
+    window.history.pushState = function (...args) {
+      originalPushState.apply(this, args);
+      handleRouteChange();
+    };
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.history.pushState = originalPushState;
+    };
+  }, [handleRouteChange]);
+
   return (
     <div className="flex h-dvh min-h-0 w-full overflow-hidden bg-bg">
       {/* Mobile sidebar overlay */}
@@ -49,6 +75,7 @@ export default function DashboardLayout({ children }) {
         <div
           className="fixed inset-0 z-40 bg-black/20 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
@@ -63,9 +90,10 @@ export default function DashboardLayout({ children }) {
 
       {/* Sidebar - Mobile: full viewport height with proper scroll containment */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 transform lg:hidden transition-transform duration-300 ease-in-out h-dvh overflow-y-auto ${
+        className={`fixed top-[var(--header-height, 4rem)] inset-y-0 left-0 z-50 transform lg:hidden transition-transform duration-300 ease-in-out h-[calc(100dvh_-_var(--header-height,_4rem))] overflow-y-auto overscroll-contain ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ "--header-height": isMacElectron ? "calc(1.25rem + var(--desktop-safe-top))" : "4rem" }}
       >
         <Sidebar onClose={() => setSidebarOpen(false)} isMacElectron={isMacElectron} />
       </div>
@@ -77,7 +105,7 @@ export default function DashboardLayout({ children }) {
       >
         <Header onMenuClick={() => setSidebarOpen(true)} />
         {!isE2EMode && <MaintenanceBanner />}
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar p-4 sm:p-6 lg:p-10">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar p-3 sm:p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto w-full">
             <Breadcrumbs />
             {children}
