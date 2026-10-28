@@ -1,7 +1,7 @@
 # 🚀 OmniRoute — The Free AI Gateway
 
 > [!WARNING]
-> **Ini adalah fork khusus untuk Android/Termux.** Turbopack dan Keytar telah dinonaktifkan, dan proses build menggunakan Webpack + kompilasi SQLite manual. Jangan gunakan perintah `npm install -g omniroute` dari dokumentasi asli.
+> **Ini adalah fork khusus untuk Android/Termux.** Turbopack dan Keytar telah dinonaktifkan; proses build menggunakan Webpack + kompilasi SQLite manual, dan kredensial Zed disimpan di file JSON terenkripsi (AES-256-GCM). Jangan gunakan perintah `npm install -g omniroute` dari dokumentasi asli. Docker dan Electron desktop tidak didukung di Termux—gunakan dashboard web.
 
 ### Never stop coding. Smart routing to **FREE & low-cost AI models** with automatic fallback.
 
@@ -13,38 +13,21 @@ _Your universal API proxy — one endpoint, 60+ providers, zero downtime. Now wi
 
 <div align="center">
 
-[![npm version](https://img.shields.io/npm/v/omniroute?color=cb3837&logo=npm)](https://www.npmjs.com/package/omniroute)
-[![Docker Hub](https://img.shields.io/docker/v/diegosouzapw/omniroute?label=Docker%20Hub&logo=docker&color=2496ED)](https://hub.docker.com/r/diegosouzapw/omniroute)
+[![stars](https://custom-icon-badges.demolab.com/github/stars/YusuP28/omniroute-termux?logo=star&style=flat)](https://github.com/YusuP28/omniroute-termux/stargazers)
+[![open issues](https://custom-icon-badges.demolab.com/github/issues-raw/YusuP28/omniroute-termux?logo=issue)](https://github.com/YusuP28/omniroute-termux/issues)
+[![license](https://custom-icon-badges.demolab.com/github/license/YusuP28/omniroute-termux?logo=law)](https://github.com/YusuP28/omniroute-termux/blob/main/LICENSE)
+[![last commit](https://custom-icon-badges.demolab.com/github/last-commit/YusuP28/omniroute-termux?logo=history&logoColor=white)](https://github.com/YusuP28/omniroute-termux/commits/main)
+[![code size](https://custom-icon-badges.demolab.com/github/languages/code-size/YusuP28/omniroute-termux?logo=file-code&logoColor=white)](https://github.com/YusuP28/omniroute-termux)
 
-![NPM Downloads](https://img.shields.io/npm/dw/omniroute?label=npm%20down%20week&color=red)
-![NPM Downloads](https://img.shields.io/npm/dm/omniroute?label=npm%20down%20month&color=red)
-
-![NPM Downloads](https://img.shields.io/npm/d18m/omniroute?label=npm%20down%20year&color=red)
-![Docker Pulls](https://img.shields.io/docker/pulls/diegosouzapw/omniroute)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/diegosouzapw/omniroute/total?style=flat&label=eletron%20donwloads&color=blue)
-
-[![stars](https://custom-icon-badges.demolab.com/github/stars/diegosouzapw/OmniRoute?logo=star&style=flat)](https://github.com/diegosouzapw/OmniRoute/stargazers)
-[![open issues](https://custom-icon-badges.demolab.com/github/issues-raw/diegosouzapw/OmniRoute?logo=issue)](https://github.com/diegosouzapw/OmniRoute/issues)
-[![license](https://custom-icon-badges.demolab.com/github/license/diegosouzapw/OmniRoute?logo=law)](https://github.com/diegosouzapw/OmniRoute/blob/main/LICENSE)
-[![last commit](https://custom-icon-badges.demolab.com/github/last-commit/diegosouzapw/OmniRoute?logo=history&logoColor=white)](https://github.com/diegosouzapw/OmniRoute/commits/main)
-[![total contributions](https://custom-icon-badges.demolab.com/badge/dynamic/json?logo=graph&logoColor=fff&color=blue&label=total%20contributions&query=%24.totalContributions&url=https%3A%2F%2Fstreak-stats.demolab.com%2F%3Fuser%3Ddiegosouzapw%26type%3Djson)](https://github.com/diegosouzapw)
-[![code size](https://custom-icon-badges.demolab.com/github/languages/code-size/diegosouzapw/OmniRoute?logo=file-code&logoColor=white)](https://github.com/diegosouzapw/OmniRoute)
-[![pr closed](https://custom-icon-badges.demolab.com/github/issues-pr-closed/diegosouzapw/OmniRoute?color=purple&logo=git-pull-request&logoColor=white)](https://github.com/diegosouzapw/OmniRoute/pulls?q=is%3Apr+is%3Aclosed)
-[![tag](https://custom-icon-badges.demolab.com/github/v/tag/diegosouzapw/OmniRoute?logo=tag&logoColor=white)](https://github.com/diegosouzapw/OmniRoute/tags)
-[![github streak](https://custom-icon-badges.demolab.com/badge/dynamic/json?logo=fire&logoColor=fff&color=orange&label=github%20streak&query=%24.currentStreak.length&suffix=%20days&url=https%3A%2F%2Fstreak-stats.demolab.com%2F%3Fuser%3Ddiegosouzapw%26type%3Djson)](https://github.com/diegosouzapw)
-[![followers](https://custom-icon-badges.demolab.com/github/followers/diegosouzapw?logo=person-add)](https://github.com/diegosouzapw?tab=followers)
-[![fork](https://custom-icon-badges.demolab.com/github/forks/diegosouzapw/OmniRoute?logo=fork)](https://github.com/diegosouzapw/OmniRoute/network/members)
-[![watch](https://custom-icon-badges.demolab.com/github/watchers/diegosouzapw/OmniRoute?logo=eye)](https://github.com/diegosouzapw/OmniRoute/watchers)
-
-[![License](https://img.shields.io/github/license/diegosouzapw/OmniRoute)](https://github.com/diegosouzapw/OmniRoute/blob/main/LICENSE)
-[![Website](https://img.shields.io/badge/Website-omniroute.online-blue?logo=google-chrome&logoColor=white)](https://omniroute.online)
-[![WhatsApp](https://img.shields.io/badge/WhatsApp-Community-25D366?logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t)
-
-[🌐 Website](https://omniroute.online) • [🚀 Quick Start](#-quick-start) • [💡 Features](#-key-features) • [📖 Docs](#-documentation) • [💰 Pricing](#-pricing-at-a-glance) • [💬 WhatsApp](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t)
+[🌐 Upstream Website](https://omniroute.online) • [🚀 Quick Start](#-quick-start) • [💡 Features](#-key-features) • [📖 Docs](#-documentation) • [💰 Pricing](#-pricing-at-a-glance) • [💬 Upstream WhatsApp](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t)
 
 </div>
 
+> **Upstream project:** [diegosouzapw/OmniRoute](https://github.com/diegosouzapw/OmniRoute). This fork maintains the Android/Termux build and documentation.
+
 🌐 **Available in:** 🇺🇸 [English](README.md) | 🇧🇷 [Português (Brasil)](docs/i18n/pt-BR/README.md) | 🇪🇸 [Español](docs/i18n/es/README.md) | 🇫🇷 [Français](docs/i18n/fr/README.md) | 🇮🇹 [Italiano](docs/i18n/it/README.md) | 🇷🇺 [Русский](docs/i18n/ru/README.md) | 🇨🇳 [中文 (简体)](docs/i18n/zh-CN/README.md) | 🇩🇪 [Deutsch](docs/i18n/de/README.md) | 🇮🇳 [हिन्दी](docs/i18n/in/README.md) | 🇹🇭 [ไทย](docs/i18n/th/README.md) | 🇺🇦 [Українська](docs/i18n/uk-UA/README.md) | 🇸🇦 [العربية](docs/i18n/ar/README.md) | 🇯🇵 [日本語](docs/i18n/ja/README.md) | 🇻🇳 [Tiếng Việt](docs/i18n/vi/README.md) | 🇧🇬 [Български](docs/i18n/bg/README.md) | 🇩🇰 [Dansk](docs/i18n/da/README.md) | 🇫🇮 [Suomi](docs/i18n/fi/README.md) | 🇮🇱 [עברית](docs/i18n/he/README.md) | 🇭🇺 [Magyar](docs/i18n/hu/README.md) | 🇮🇩 [Bahasa Indonesia](docs/i18n/id/README.md) | 🇰🇷 [한국어](docs/i18n/ko/README.md) | 🇲🇾 [Bahasa Melayu](docs/i18n/ms/README.md) | 🇳🇱 [Nederlands](docs/i18n/nl/README.md) | 🇳🇴 [Norsk](docs/i18n/no/README.md) | 🇵🇹 [Português (Portugal)](docs/i18n/pt/README.md) | 🇷🇴 [Română](docs/i18n/ro/README.md) | 🇵🇱 [Polski](docs/i18n/pl/README.md) | 🇸🇰 [Slovenčina](docs/i18n/sk/README.md) | 🇸🇪 [Svenska](docs/i18n/sv/README.md) | 🇵🇭 [Filipino](docs/i18n/phi/README.md) | 🇨🇿 [Čeština](docs/i18n/cs/README.md)
+
+> Translations are inherited from upstream and may still mention the global `npm install -g omniroute`. Only this English README and [`docs/ANDROID-TERMUX.md`](docs/ANDROID-TERMUX.md) document the Termux/Android build.
 
 ---
 
@@ -182,24 +165,25 @@ _Connect any AI-powered IDE or CLI tool through OmniRoute — free API gateway f
 
 ## 📧 Support
 
-> 💬 **Join our community!** [WhatsApp Group](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t) — Get help, share tips, and stay updated.
+> 💬 **Join the upstream community!** [WhatsApp Group](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t) — Get help, share tips, and stay updated. For this fork, please use the fork issue tracker below.
 
-- **Website**: [omniroute.online](https://omniroute.online)
-- **GitHub**: [github.com/diegosouzapw/OmniRoute](https://github.com/diegosouzapw/OmniRoute)
-- **Issues**: [github.com/diegosouzapw/OmniRoute/issues](https://github.com/diegosouzapw/OmniRoute/issues)
-- **WhatsApp**: [Community Group](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t)
-- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md), open a PR, or pick a `good first issue`
+- **Fork repository**: [github.com/YusuP28/omniroute-termux](https://github.com/YusuP28/omniroute-termux)
+- **Fork issues**: [github.com/YusuP28/omniroute-termux/issues](https://github.com/YusuP28/omniroute-termux/issues)
+- **Upstream project**: [github.com/diegosouzapw/OmniRoute](https://github.com/diegosouzapw/OmniRoute)
+- **Upstream website**: [omniroute.online](https://omniroute.online)
+- **Upstream WhatsApp**: [Community Group](https://chat.whatsapp.com/JI7cDQ1GyaiDHhVBpLxf8b?mode=gi_t)
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md), open a PR against this fork, or pick a `good first issue`
 - **Original Project**: [9router by decolua](https://github.com/decolua/9router)
 
 ### 🐛 Reporting a Bug?
 
-When opening an issue, please run the system-info command and attach the generated file:
+When opening an issue in this fork, please run the system-info command and attach the generated file:
 
 ```bash
 npm run system-info
 ```
 
-This generates a `system-info.txt` with your Node.js version, OmniRoute version, OS details, installed CLI tools (qoder, gemini, claude, codex, antigravity, droid, etc.), Docker/PM2 status, and system packages — everything we need to reproduce your issue quickly. Attach the file directly to your GitHub issue.
+This generates a `system-info.txt` with your Node.js version, OmniRoute version, OS details, installed CLI tools (qoder, gemini, claude, codex, antigravity, droid, etc.), Docker/PM2 status, and system packages — everything we need to reproduce your issue quickly. Attach the file directly to your fork issue.
 
 ---
 
@@ -403,7 +387,7 @@ Installing, configuring, and maintaining an AI proxy across different environmen
 
 **How OmniRoute solves it:**
 
-- **npm global install** — `npm install -g omniroute && omniroute` — done
+- **npm global install (upstream only)** — not used by this Termux fork; use the source build in Quick Start.
 - **Docker Multi-Platform** — AMD64 + ARM64 native (Apple Silicon, AWS Graviton, Raspberry Pi)
 - **Docker Compose Profiles** — `base` (no CLI tools) and `cli` (with Claude Code, Codex, OpenClaw)
 - **Electron Desktop App** — Native app for Windows/macOS/Linux with system tray, auto-start, offline mode
@@ -504,7 +488,7 @@ Many AI gateways expose MCP only as a hidden implementation detail. Teams need a
 
 - MCP appears in the dashboard navigation and endpoint protocol tab
 - Dedicated MCP management page with process, tools, scopes, and audit
-- Built-in quick-start for `omniroute --mcp` and client onboarding
+- Built-in quick-start for `npm run mcp` and client onboarding
 
 </details>
 
@@ -719,7 +703,7 @@ Outcome: deep fallback depth for deadline-critical workloads
 **Playbook D: Agent ops with MCP + A2A**
 
 ```txt
-1) Start MCP transport (`omniroute --mcp`) for tool-driven operations
+1) Start MCP transport (`npm run mcp`) for tool-driven operations
 2) Run A2A tasks via `message/send` and `message/stream`
 3) Observe via /dashboard/endpoint (MCP and A2A tabs)
 4) Toggle services via inline status controls
@@ -755,6 +739,8 @@ Outcome: deep fallback depth for deadline-critical workloads
 pkg update && pkg upgrade
 pkg install nodejs python build-essential git
 ```
+
+> This fork is tested with Node.js 24.22.1 on Termux. If you switch Node versions later, re-run the SQLite rebuild step below.
 
 2. Clone this repository and enter it:
 
@@ -842,7 +828,7 @@ Works with Claude Code, Codex CLI, Gemini CLI, Cursor, Cline, OpenClaw, OpenCode
 **MCP (for tool-driven operations):**
 
 ```bash
-omniroute --mcp
+npm run mcp
 ```
 
 Then connect your MCP client over `stdio` and test tools like:
@@ -991,6 +977,8 @@ post_install() {
 
 ## 🐳 Docker
 
+> **Termux/Android:** Docker is not available on Termux, and the upstream image does not include this fork's Android patches. This section is for upstream/non-Termux deployments only.
+
 OmniRoute is available as a public Docker image on [Docker Hub](https://hub.docker.com/r/diegosouzapw/omniroute).
 
 **Quick run:**
@@ -1081,6 +1069,8 @@ volumes:
 ---
 
 ## 🖥️ Desktop App — Offline & Always-On
+
+> **Termux/Android:** Electron desktop builds are not supported. Use the web dashboard served by `npm run start`.
 
 > 🆕 **NEW!** OmniRoute is now available as a **native desktop application** for Windows, macOS, and Linux.
 
@@ -1534,7 +1524,7 @@ The pre-loaded "OmniRoute Golden Set" contains test cases for:
 Start MCP transport in stdio mode:
 
 ```bash
-omniroute --mcp
+npm run mcp
 ```
 
 Recommended validation flow:
@@ -2188,7 +2178,7 @@ Se não quiser criar credenciais próprias agora, ainda é possível usar o flux
 <details>
 <summary><b>Click to expand tech stack details</b></summary>
 
-- **Runtime**: Node.js 18–22 LTS (⚠️ Node.js 24+ is **not supported** — `better-sqlite3` native binaries are incompatible)
+- **Runtime**: Node.js 18–24 (this fork is tested on Node.js 24.22.1 on Termux; rebuild `better-sqlite3` after changing Node versions)
 - **Language**: TypeScript 5.9 — **100% TypeScript** across `src/` and `open-sse/` (zero `any` in core modules since v2.0)
 - **Framework**: Next.js 16 + React 19 + Tailwind CSS 4
 - **Database**: LowDB (JSON) + SQLite (domain state + proxy logs + MCP audit + routing decisions)
@@ -2197,10 +2187,11 @@ Se não quiser criar credenciais próprias agora, ainda é possível usar o flux
 - **Streaming**: Server-Sent Events (SSE)
 - **Auth**: OAuth 2.0 (PKCE) + JWT + API Keys + MCP Scoped Authorization
 - **Testing**: Node.js test runner + Vitest (900+ tests including unit, integration, E2E)
-- **CI/CD**: GitHub Actions (auto npm publish + Docker Hub on release)
-- **Website**: [omniroute.online](https://omniroute.online)
-- **Package**: [npmjs.com/package/omniroute](https://www.npmjs.com/package/omniroute)
-- **Docker**: [hub.docker.com/r/diegosouzapw/omniroute](https://hub.docker.com/r/diegosouzapw/omniroute)
+- **CI/CD**: Manual fork workflow (local Termux build + tests); upstream GitHub Actions are not included in this fork
+- **Fork version**: 3.8.52
+- **Upstream website**: [omniroute.online](https://omniroute.online)
+- **Upstream npm package**: [npmjs.com/package/omniroute](https://www.npmjs.com/package/omniroute)
+- **Upstream Docker image**: [hub.docker.com/r/diegosouzapw/omniroute](https://hub.docker.com/r/diegosouzapw/omniroute)
 - **Resilience**: Circuit breaker, exponential backoff, anti-thundering herd, TLS spoofing, auto-combo self-healing
 
 </details>
@@ -2211,6 +2202,7 @@ Se não quiser criar credenciais próprias agora, ainda é possível usar o flux
 
 | Document                                        | Description                                         |
 | ----------------------------------------------- | --------------------------------------------------- |
+| [Android/Termux](docs/ANDROID-TERMUX.md)        | Fork setup, SQLite rebuild, tmux/wake-lock          |
 | [User Guide](docs/USER_GUIDE.md)                | Providers, combos, CLI integration, deployment      |
 | [API Reference](docs/API_REFERENCE.md)          | All endpoints with examples                         |
 | [MCP Server](open-sse/mcp-server/README.md)     | 25 MCP tools, IDE configs, Python/TS/Go clients     |
