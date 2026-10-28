@@ -23,7 +23,7 @@
     "open-sse"
   ],
   "engines": {
-    "node": ">=18.0.0 <24.0.0"
+    "node": ">=18.0.0 <25.0.0"
   },
   "keywords": [
     "ai",
@@ -54,6 +54,7 @@
     "build:android": "cross-env NODE_OPTIONS=--max-old-space-size=4096 next build --webpack",
     "build:cli": "node scripts/prepublish.mjs",
     "start": "node scripts/run-next.mjs start",
+    "mcp": "node bin/omniroute.mjs --mcp",
     "lint": "eslint .",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:20128 && cd electron && npm run dev\"",
     "electron:build": "npm run build && cd electron && npm run build",
