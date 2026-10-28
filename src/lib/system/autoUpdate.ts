@@ -64,6 +64,16 @@ function parsePatchCommits(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+export const AUTO_UPDATE_DISABLED_REASON =
+  "Auto-update is disabled on Android/Termux or because OMNIROUTE_DISABLE_AUTO_UPDATE=1. Rebuild and restart manually.";
+
+export function isAutoUpdateDisabled(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  return env.OMNIROUTE_DISABLE_AUTO_UPDATE === "1" || platform === "android";
+}
+
 export function getAutoUpdateConfig(env: NodeJS.ProcessEnv = process.env): AutoUpdateConfig {
   const dataDir = env.DATA_DIR || "/tmp/omniroute";
   const repoDir = env.AUTO_UPDATE_REPO_DIR || "/workspace/omniroute";
@@ -298,14 +308,27 @@ export async function launchAutoUpdate({
   execFileImpl = execFileAsync,
   spawnImpl = spawn,
   existsImpl = pathExists,
+  platform = process.platform,
 }: {
   latest: string;
   env?: NodeJS.ProcessEnv;
   execFileImpl?: ExecFileLike;
   spawnImpl?: SpawnLike;
   existsImpl?: (targetPath: string) => Promise<boolean>;
+  platform?: NodeJS.Platform;
 }): Promise<AutoUpdateLaunchResult> {
   const config = getAutoUpdateConfig(env);
+
+  if (isAutoUpdateDisabled(env, platform)) {
+    return {
+      started: false,
+      channel: config.mode,
+      logPath: config.logPath,
+      composeCommand: null,
+      error: AUTO_UPDATE_DISABLED_REASON,
+    };
+  }
+
   const validation = await validateAutoUpdateRuntime(config, execFileImpl, existsImpl);
 
   if (!validation.supported) {

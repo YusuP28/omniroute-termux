@@ -10,8 +10,10 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { isAuthenticated } from "@/shared/utils/apiAuth";
 import {
+  AUTO_UPDATE_DISABLED_REASON,
   ensureGitTagExists,
   getAutoUpdateConfig,
+  isAutoUpdateDisabled,
   launchAutoUpdate,
   validateAutoUpdateRuntime,
 } from "@/lib/system/autoUpdate";
@@ -59,7 +61,9 @@ export async function GET(req: NextRequest) {
   const latest = await getLatestNpmVersion();
   const updateAvailable = isNewer(latest, current);
   const config = getAutoUpdateConfig();
-  const validation = await validateAutoUpdateRuntime(config);
+  const validation = isAutoUpdateDisabled()
+    ? { supported: false, reason: AUTO_UPDATE_DISABLED_REASON, composeCommand: null }
+    : await validateAutoUpdateRuntime(config);
 
   return NextResponse.json({
     current,
@@ -74,6 +78,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!(await isAuthenticated(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (isAutoUpdateDisabled()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: AUTO_UPDATE_DISABLED_REASON,
+        code: "AUTO_UPDATE_DISABLED",
+      },
+      { status: 403 }
+    );
   }
 
   const current = getCurrentVersion();

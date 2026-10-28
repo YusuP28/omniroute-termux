@@ -98,6 +98,23 @@ describe("validateAutoUpdateRuntime", () => {
   });
 });
 
+describe("isAutoUpdateDisabled", () => {
+  it("blocks Android regardless of the environment", () => {
+    assert.equal(autoUpdate.isAutoUpdateDisabled({}, "android"), true);
+  });
+
+  it("blocks when OMNIROUTE_DISABLE_AUTO_UPDATE=1", () => {
+    assert.equal(
+      autoUpdate.isAutoUpdateDisabled({ OMNIROUTE_DISABLE_AUTO_UPDATE: "1" }, "linux"),
+      true
+    );
+  });
+
+  it("allows other platforms without the environment flag", () => {
+    assert.equal(autoUpdate.isAutoUpdateDisabled({}, "linux"), false);
+  });
+});
+
 describe("buildDockerComposeUpdateScript", () => {
   it("includes git checkout and compose rebuild steps", () => {
     const config = autoUpdate.getAutoUpdateConfig({

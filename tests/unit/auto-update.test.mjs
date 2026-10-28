@@ -283,8 +283,9 @@ test("launchAutoUpdate returns validation failures and starts detached update sc
     latest: "3.6.0",
     env: {
       AUTO_UPDATE_MODE: "source",
-      AUTO_UPDATE_LOG_PATH: "/tmp/auto-update-source.log",
+      AUTO_UPDATE_LOG_PATH: path.join(os.tmpdir(), "omniroute-auto-update-source.log"),
     },
+    platform: "linux",
     existsImpl: async () => false,
   });
 
@@ -298,8 +299,9 @@ test("launchAutoUpdate returns validation failures and starts detached update sc
     env: {
       AUTO_UPDATE_MODE: "source",
       AUTO_UPDATE_GIT_REMOTE: "upstream",
-      AUTO_UPDATE_LOG_PATH: "/tmp/auto-update-source.log",
+      AUTO_UPDATE_LOG_PATH: path.join(os.tmpdir(), "omniroute-auto-update-source.log"),
     },
+    platform: "linux",
     execFileImpl: async (command, args) => {
       if (command === "git" && args[0] === "--version") {
         return { stdout: "git version 2.0", stderr: "" };
@@ -346,6 +348,7 @@ test("launchAutoUpdate returns validation failures and starts detached update sc
       AUTO_UPDATE_PATCH_COMMITS: "abc123",
       AUTO_UPDATE_LOG_PATH: logPath,
     },
+    platform: "linux",
     execFileImpl: async (command, args) => {
       execCalls.push([command, args]);
       if (command === "git" && args[0] === "--version") {
@@ -393,4 +396,22 @@ test("launchAutoUpdate returns validation failures and starts detached update sc
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
+});
+
+test("launchAutoUpdate refuses to spawn when auto-update is disabled", async () => {
+  let spawnCalled = false;
+
+  const result = await autoUpdate.launchAutoUpdate({
+    latest: "9.9.9",
+    env: { OMNIROUTE_DISABLE_AUTO_UPDATE: "1" },
+    platform: "linux",
+    spawnImpl: () => {
+      spawnCalled = true;
+      throw new Error("spawn should not be called");
+    },
+  });
+
+  assert.equal(result.started, false);
+  assert.match(result.error, /disabled/i);
+  assert.equal(spawnCalled, false);
 });
