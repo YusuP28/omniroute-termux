@@ -1,5 +1,8 @@
 # 🚀 OmniRoute — The Free AI Gateway
 
+> [!WARNING]
+> **Ini adalah fork khusus untuk Android/Termux.** Turbopack dan Keytar telah dinonaktifkan, dan proses build menggunakan Webpack + kompilasi SQLite manual. Jangan gunakan perintah `npm install -g omniroute` dari dokumentasi asli.
+
 ### Never stop coding. Smart routing to **FREE & low-cost AI models** with automatic fallback.
 
 _Your universal API proxy — one endpoint, 60+ providers, zero downtime. Now with **MCP Server (25 tools)**, **A2A Protocol**, **Memory/Skills Systems** & **Electron Desktop App**._
@@ -742,38 +745,51 @@ Outcome: deep fallback depth for deadline-critical workloads
 
 ## ⚡ Quick Start
 
-### 1) Install and run
+### 1) Install and run on Termux/Android
+
+> **Android/Termux only.** Do not use the global `npm install -g omniroute` command from the upstream documentation. Use the source build below.
+
+1. Install the required packages:
 
 ```bash
-npm install -g omniroute
-omniroute
+pkg update && pkg upgrade
+pkg install nodejs python build-essential git
 ```
 
-> **pnpm users:** Run `pnpm approve-builds -g` after install to enable native build scripts required by `better-sqlite3` and `@swc/core`:
->
-> ```bash
-> pnpm install -g omniroute
-> pnpm approve-builds -g   # Select all packages → approve
-> omniroute
-> ```
-
-Dashboard opens at `http://localhost:20128` and API base URL is `http://localhost:20128/v1`.
-
-| Command                 | Description                                                 |
-| ----------------------- | ----------------------------------------------------------- |
-| `omniroute`             | Start server (`PORT=20128`, API and dashboard on same port) |
-| `omniroute --port 3000` | Set canonical/API port to 3000                              |
-| `omniroute --mcp`       | Start MCP server (stdio transport)                          |
-| `omniroute --no-open`   | Don't auto-open browser                                     |
-| `omniroute --help`      | Show help                                                   |
-
-Optional split-port mode:
+2. Clone this repository and enter it:
 
 ```bash
-PORT=20128 DASHBOARD_PORT=20129 omniroute
-# API:       http://localhost:20128/v1
-# Dashboard: http://localhost:20129
+git clone https://github.com/YusuP28/omniroute-termux.git
+cd omniroute-termux
 ```
+
+3. Install dependencies without running native build scripts:
+
+```bash
+npm install --ignore-scripts --force
+```
+
+4. Compile `better-sqlite3` for Android ARM64:
+
+```bash
+bash scripts/android/rebuild-better-sqlite3.sh
+```
+
+5. Build the app with Webpack (Turbopack is disabled):
+
+```bash
+NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1 npm run build
+```
+
+6. Start the server:
+
+```bash
+NODE_OPTIONS="--max-old-space-size=4096" npm run start
+```
+
+Dashboard and API are available at `http://localhost:20128` (API base URL: `http://localhost:20128/v1`).
+
+> **Keep the server alive:** run `termux-wake-lock` so Android does not suspend Termux. For a persistent background session, start the server inside `tmux`. See [`docs/ANDROID-TERMUX.md`](docs/ANDROID-TERMUX.md) for details.
 
 ### Long-Running Streaming Timeouts
 
@@ -855,6 +871,8 @@ npm run test:protocols:e2e
 This suite validates real MCP and A2A client flows against a running app.
 
 ### Alternative: run from source
+
+> **Android/Termux:** use the [Quick Start Termux steps](#1-install-and-run-on-termuxandroid) above. The generic commands below do not rebuild `better-sqlite3` for Android.
 
 ```bash
 cp .env.example .env
