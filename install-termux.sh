@@ -30,6 +30,9 @@ trap 'log_error "Installation failed at line $LINENO. Exit code: $?"; exit 1' ER
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+# Termux has no reliable /tmp — prefer TMPDIR from Termux ($PREFIX/tmp).
+TMP_LOG_DIR="${TMPDIR:-/tmp}"
+
 log_step "OmniRoute Termux Installer Starting"
 log_info "Project root: $PROJECT_ROOT"
 log_info "Architecture: $(uname -m)"
@@ -93,6 +96,25 @@ npm install --ignore-scripts --force || { log_error "npm install failed"; exit 1
 log_success "npm dependencies installed (scripts skipped)"
 
 # =============================================================================
+# STEP 3.5: Disable keytar (requires libsecret — unsupported on Termux)
+# =============================================================================
+log_step "STEP 3.5: Disabling keytar (libsecret is unavailable on Android/Termux)"
+
+KEYTAR_DIR="$PROJECT_ROOT/node_modules/keytar"
+KEYTAR_DISABLED_DIR="$PROJECT_ROOT/node_modules/keytar_disabled"
+
+if [[ -d "$KEYTAR_DIR" ]]; then
+    rm -rf "$KEYTAR_DISABLED_DIR"
+    mv "$KEYTAR_DIR" "$KEYTAR_DISABLED_DIR"
+    log_warn "keytar dinonaktifkan ($KEYTAR_DISABLED_DIR)"
+    log_info "OmniRoute akan memakai fallback store terenkripsi (zed-credentials.json)"
+elif [[ -d "$KEYTAR_DISABLED_DIR" ]]; then
+    log_info "keytar sudah dinonaktifkan sebelumnya (keytar_disabled)"
+else
+    log_info "keytar tidak terpasang — fallback store terenkripsi akan dipakai"
+fi
+
+# =============================================================================
 # STEP 4: Manually Compile better-sqlite3 via node-gyp
 # =============================================================================
 log_step "STEP 4: Compiling better-sqlite3 manually"
@@ -119,7 +141,7 @@ node-gyp rebuild \
     --arch=arm64 \
     --platform=android \
     --libc=glibc \
-    2>&1 | tee /tmp/better-sqlite3-build.log || {
+    2>&1 | tee "${TMP_LOG_DIR}"/better-sqlite3-build.log || {
     log_warn "node-gyp rebuild failed, trying alternative approach..."
     
     # Try with explicit Python and compiler
@@ -127,8 +149,8 @@ node-gyp rebuild \
         --target=$(node -p "process.version.slice(1)") \
         --arch=arm64 \
         --platform=android \
-        2>&1 | tee -a /tmp/better-sqlite3-build.log
-} || { log_error "better-sqlite3 compilation failed. Check /tmp/better-sqlite3-build.log"; exit 1; }
+        2>&1 | tee -a ${TMP_LOG_DIR}/better-sqlite3-build.log
+} || { log_error "better-sqlite3 compilation failed. Check ${TMP_LOG_DIR}/better-sqlite3-build.log"; exit 1; }
 
 # Verify the compiled binary
 if [[ -f "build/Release/better_sqlite3.node" ]] || \
@@ -146,7 +168,7 @@ cd "$PROJECT_ROOT"
 # =============================================================================
 log_step "STEP 5: Compiling other native dependencies"
 
-NATIVE_PKGS=("keytar" "@swc/core" "better-sqlite3")
+NATIVE_PKGS=("@swc/core" "better-sqlite3")
 for pkg in "${NATIVE_PKGS[@]}"; do
     PKG_DIR="$PROJECT_ROOT/node_modules/$pkg"
     if [[ -d "$PKG_DIR" && -f "$PKG_DIR/binding.gyp" ]]; then
@@ -157,7 +179,7 @@ for pkg in "${NATIVE_PKGS[@]}"; do
             --target=$(node -p "process.version.slice(1)") \
             --arch=arm64 \
             --platform=android \
-            2>&1 | tee "/tmp/$pkg-build.log" || log_warn "$pkg compilation had issues (may have prebuilt)"
+            2>&1 | tee "${TMP_LOG_DIR}/$pkg-build.log" || log_warn "$pkg compilation had issues (may have prebuilt)"
         cd "$PROJECT_ROOT"
     fi
 done
@@ -183,8 +205,8 @@ log_info "NODE_OPTIONS set to: $NODE_OPTIONS"
 
 # Ensure we use webpack (not turbopack) for better compatibility
 log_info "Running: next build --webpack"
-npm run build 2>&1 | tee /tmp/next-build.log || {
-    log_error "Next.js build failed. Check /tmp/next-build.log"
+npm run build 2>&1 | tee "${TMP_LOG_DIR}/next-build.log" || {
+    log_error "Next.js build failed. Check ${TMP_LOG_DIR}/next-build.log"
     exit 1
 }
 log_success "Next.js production build completed"
