@@ -99,6 +99,7 @@ docs/*
 !docs/MCP-SERVER.md
 !docs/CLI-TOOLS.md
 !docs/COVERAGE_PLAN.md
+!docs/ANDROID-TERMUX.md
 
 
 # open-sse tests
