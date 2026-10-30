@@ -1,5 +1,11 @@
 # omniroute — Agent Guidelines
 
+## 🧠 Long-Term Memory Protocol
+
+1. **BACA DULU**: Sebelum melakukan eksplorasi kode atau mengeksekusi tugas, SELALU baca `MEMORY.md` di root proyek.
+2. **CATAT SETELAH SELESAI**: Setiap kali kamu berhasil memperbaiki bug yang rumit, mengubah arsitektur, atau menyelesaikan fitur besar, WAJIB tambahkan ringkasan singkat ke bagian yang relevan di `MEMORY.md`.
+3. Jangan hapus catatan lama di `MEMORY.md` kecuali saya memintanya.
+
 ## Project
 
 Unified AI proxy/router — route any LLM through one endpoint. Multi-provider support
@@ -9,7 +15,7 @@ with **MCP Server** (25 tools), **A2A v0.3 Protocol**, and **Electron desktop ap
 
 ## Stack
 
-- **Runtime**: Next.js 16 (App Router), Node.js ≥18 <24, ES Modules (`"type": "module"`)
+- **Runtime**: Next.js 16 (App Router), Node.js ≥18 <25 (tested on Node 24.22.1 in Termux), ES Modules (`"type": "module"`)
 - **Language**: TypeScript 5.9 (`src/`) + JavaScript (`open-sse/`, `electron/`)
 - **Database**: better-sqlite3 (SQLite) — `DATA_DIR` configurable, default `~/.omniroute/`
 - **Streaming**: SSE via `open-sse` internal workspace package

@@ -1647,6 +1647,14 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
     }
   };
 
+  const handleAddMultipleModels = (modelList) => {
+    modelList.forEach((model) => {
+      if (!models.find((m) => m.model === model.value)) {
+        setModels((prev) => [...prev, { model: model.value, weight: 0 }]);
+      }
+    });
+  };
+
   const handleRemoveModel = (index) => {
     setModels(models.filter((_, i) => i !== index));
   };
@@ -2551,11 +2559,14 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders }) {
         isOpen={showModelSelect}
         onClose={() => setShowModelSelect(false)}
         onSelect={handleAddModel}
+        onSelectMultiple={handleAddMultipleModels}
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title={t("addModelToCombo")}
         selectedModel={null}
         addedModelValues={models.map((m) => m.model)}
+        multiSelect={true}
+        maxSelections={20}
       />
     </>
   );

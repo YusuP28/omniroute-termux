@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { UsageAnalytics, CardSkeleton, SegmentedControl } from "@/shared/components";
+import { UsageAnalytics, CardSkeleton, SegmentedControl, ProviderNodeGraph } from "@/shared/components";
 import EvalsTab from "../usage/components/EvalsTab";
 import SearchAnalyticsTab from "./SearchAnalyticsTab";
 import DiversityScoreCard from "./components/DiversityScoreCard";
@@ -46,6 +46,9 @@ export default function AnalyticsPage() {
 
       {activeTab === "overview" && (
         <>
+          <Suspense fallback={<CardSkeleton />}>
+            <ProviderNodeGraph />
+          </Suspense>
           <Suspense fallback={<CardSkeleton />}>
             <UsageAnalytics />
           </Suspense>
